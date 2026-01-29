@@ -1,19 +1,61 @@
-# build-mosh
-Wrapper to compile Mosh for iOS. This is used to compile a library packaging Mosh to be used in [Blink](http://github.com/blinksh/blink). Please do not use it to compile mosh-client or mosh-server versions. Refer to the original [Mosh](https://github.com/mobile-shell/mosh) for that.
+# libmosh - Mosh iOS Library
+
+Build system for compiling [Mosh](https://github.com/mobile-shell/mosh) as a static library for iOS.
+
+This is a fork of [blinksh/build-mosh](https://github.com/blinksh/build-mosh), modernized for current iOS development:
+
+- **iOS 17.0+** deployment target
+- **arm64** device and **arm64/x86_64** simulator support
+- **xcframework** output format
+- Uses existing Protobuf framework from Wispy project
 
 ## Requirements
-- XCode 7
-- XCode Command Line Tools
-- iOS SDK.
 
-## Building
 ```bash
-git clone --recursive https://github.com/blinksh/build-mosh.git && cd build-mosh
-./build-all.sh
+brew install automake autoconf libtool pkg-config protobuf@21
 ```
 
-This script will build both Mosh and libprotobuf for iOS. The resulting Mosh for iOS will be packaged as libmoshios.framework on the root. The resulting libprotobuf.a will be under build-protobuf/protobuf-ver/lib.
+Note: protobuf@21 is required to match the Protobuf_C_.xcframework version (3.21.x).
 
-If you want to customize the compilation of any piece, go to the corresopnding build-mosh or build-protobuf scripts.
+## Building
 
-Special thanks to @dariaphoebe for helping to simplify the compilation :)
+```bash
+git submodule update --init --recursive
+./build.sh
+```
+
+This will:
+1. Build mosh for iOS arm64 (device)
+2. Build mosh for iOS Simulator (arm64 + x86_64)
+3. Create `mosh.xcframework`
+4. Install to `../Frameworks/mosh.xcframework`
+
+## Output
+
+- `mosh.xcframework` - Universal xcframework for iOS
+- Installed to `Wispy/Frameworks/mosh.xcframework`
+
+## API
+
+The library exposes a single entry point for the iOS client:
+
+```c
+int mosh_main(
+    FILE *f_in, FILE *f_out, struct winsize *window_size,
+    void (*state_callback)(const void *, const void *, size_t),
+    void *state_callback_context,
+    const char *ip, const char *port, const char *key, const char *predict_mode,
+    const char *encoded_state_buffer, size_t encoded_state_size,
+    const char *predict_overwrite
+);
+```
+
+## Submodules
+
+- `mosh/` - [blinksh/mosh](https://github.com/blinksh/mosh) (mosh-1.4 branch) - Mosh with iOS modifications
+- `build-protobuf/` - Protobuf build scripts (not used - we use existing xcframework)
+
+## Credits
+
+- Original [Mosh](https://github.com/mobile-shell/mosh) by Keith Winstein
+- iOS port by [Blink Shell](https://github.com/blinksh/mosh)

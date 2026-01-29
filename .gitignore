@@ -1,1 +1,11 @@
 *~
+
+# Build artifacts
+build/
+output/
+mosh.xcframework/
+
+# Old build system artifacts
+protobuf-release/
+libmoshios.framework/
+headers/
