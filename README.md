@@ -7,33 +7,40 @@ This is a fork of [blinksh/build-mosh](https://github.com/blinksh/build-mosh), m
 - **iOS 17.0+** deployment target
 - **arm64** device and **arm64/x86_64** simulator support
 - **xcframework** output format
-- Uses existing Protobuf framework from Wispy project
+- Self-contained Protobuf build
 
 ## Requirements
 
 ```bash
-brew install automake autoconf libtool pkg-config protobuf@21
+brew install automake autoconf libtool
 ```
 
-Note: protobuf@21 is required to match the Protobuf_C_.xcframework version (3.21.x).
-
-## Building
+## Building (Self-Contained)
 
 ```bash
 git submodule update --init --recursive
+
+# Build protobuf first
+./build-protobuf/build.sh
+
+# Build mosh
 ./build.sh
 ```
 
-This will:
-1. Build mosh for iOS arm64 (device)
-2. Build mosh for iOS Simulator (arm64 + x86_64)
-3. Create `mosh.xcframework`
-4. Install to `../Frameworks/mosh.xcframework`
+## Building (From Wispy Repo)
+
+```bash
+# From Wispy root:
+./scripts/build-protobuf.sh
+./scripts/build-mosh.sh
+```
 
 ## Output
 
-- `mosh.xcframework` - Universal xcframework for iOS
-- Installed to `Wispy/Frameworks/mosh.xcframework`
+- `build-protobuf/Protobuf.xcframework` - Protobuf for iOS
+- `mosh.xcframework` - Mosh for iOS
+
+When run from Wispy repo, frameworks are also installed to `Wispy/Frameworks/`.
 
 ## API
 
@@ -53,7 +60,6 @@ int mosh_main(
 ## Submodules
 
 - `mosh/` - [blinksh/mosh](https://github.com/blinksh/mosh) (mosh-1.4 branch) - Mosh with iOS modifications
-- `build-protobuf/` - Protobuf build scripts (not used - we use existing xcframework)
 
 ## Credits
 

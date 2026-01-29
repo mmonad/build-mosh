@@ -29,7 +29,6 @@ fi
 
 # Configuration
 IOS_DEPLOYMENT_TARGET="17.0"
-PROTOC="/opt/homebrew/opt/protobuf@21/bin/protoc"
 
 # Directories
 MOSH_SRC="$LIBMOSH_DIR/mosh"
@@ -37,11 +36,24 @@ BUILD_DIR="$LIBMOSH_DIR/build"
 OUTPUT_DIR="$LIBMOSH_DIR/output"
 NCURSES_HEADERS="$BUILD_DIR/ncurses-headers"
 
-# Protobuf xcframework - check both possible locations
-if [ -d "$ROOT_DIR/Frameworks/Protobuf_C_.xcframework" ]; then
+# Protoc - check local build first, then parent, then homebrew
+if [ -x "$LIBMOSH_DIR/build-protobuf/output/host/bin/protoc" ]; then
+    PROTOC="$LIBMOSH_DIR/build-protobuf/output/host/bin/protoc"
+elif [ -x "$ROOT_DIR/bin/protoc" ]; then
+    PROTOC="$ROOT_DIR/bin/protoc"
+elif [ -x "/opt/homebrew/opt/protobuf@21/bin/protoc" ]; then
+    PROTOC="/opt/homebrew/opt/protobuf@21/bin/protoc"
+else
+    PROTOC=""
+fi
+
+# Protobuf xcframework - check local build first, then parent Frameworks
+if [ -d "$LIBMOSH_DIR/build-protobuf/Protobuf.xcframework" ]; then
+    PROTOBUF_XCFRAMEWORK="$LIBMOSH_DIR/build-protobuf/Protobuf.xcframework"
+elif [ -d "$ROOT_DIR/Frameworks/Protobuf.xcframework" ]; then
+    PROTOBUF_XCFRAMEWORK="$ROOT_DIR/Frameworks/Protobuf.xcframework"
+elif [ -d "$ROOT_DIR/Frameworks/Protobuf_C_.xcframework" ]; then
     PROTOBUF_XCFRAMEWORK="$ROOT_DIR/Frameworks/Protobuf_C_.xcframework"
-elif [ -d "$LIBMOSH_DIR/../Frameworks/Protobuf_C_.xcframework" ]; then
-    PROTOBUF_XCFRAMEWORK="$LIBMOSH_DIR/../Frameworks/Protobuf_C_.xcframework"
 else
     PROTOBUF_XCFRAMEWORK=""
 fi
@@ -65,7 +77,6 @@ check_requirements() {
     log_info "Checking requirements..."
 
     local missing=()
-    [ -x "$PROTOC" ] || missing+=("protobuf@21")
     command -v automake >/dev/null || missing+=("automake")
     command -v autoconf >/dev/null || missing+=("autoconf")
     xcrun -f libtool >/dev/null 2>&1 || { log_error "Xcode libtool not found"; exit 1; }
@@ -76,9 +87,15 @@ check_requirements() {
         exit 1
     fi
 
+    if [ -z "$PROTOC" ] || [ ! -x "$PROTOC" ]; then
+        log_error "protoc not found"
+        log_error "Build protobuf first: ./build-protobuf/build.sh"
+        exit 1
+    fi
+
     if [ -z "$PROTOBUF_XCFRAMEWORK" ] || [ ! -d "$PROTOBUF_XCFRAMEWORK" ]; then
         log_error "Protobuf xcframework not found"
-        log_error "Expected at: Frameworks/Protobuf_C_.xcframework"
+        log_error "Build protobuf first: ./build-protobuf/build.sh"
         exit 1
     fi
 
@@ -88,6 +105,8 @@ check_requirements() {
     fi
 
     log_info "All requirements satisfied"
+    log_info "Using protoc: $PROTOC"
+    log_info "Using protobuf: $PROTOBUF_XCFRAMEWORK"
 }
 
 # Clean previous builds
@@ -134,12 +153,20 @@ EOF
 get_protobuf_paths() {
     local PLATFORM=$1
 
+    # Detect framework name (Protobuf or Protobuf_C_)
+    local FW_NAME
+    if [ -d "$PROTOBUF_XCFRAMEWORK/ios-arm64/Protobuf.framework" ]; then
+        FW_NAME="Protobuf"
+    else
+        FW_NAME="Protobuf_C_"
+    fi
+
     case "$PLATFORM" in
         ios-arm64)
-            echo "$PROTOBUF_XCFRAMEWORK/ios-arm64/Protobuf_C_.framework"
+            echo "$PROTOBUF_XCFRAMEWORK/ios-arm64/$FW_NAME.framework"
             ;;
         sim-arm64|sim-x86_64)
-            echo "$PROTOBUF_XCFRAMEWORK/ios-arm64_x86_64-simulator/Protobuf_C_.framework"
+            echo "$PROTOBUF_XCFRAMEWORK/ios-arm64_x86_64-simulator/$FW_NAME.framework"
             ;;
     esac
 }
@@ -163,7 +190,9 @@ build_mosh() {
     # Get protobuf framework path
     local PROTOBUF_FW=$(get_protobuf_paths "$OUTPUT_NAME")
     local PROTOBUF_HEADERS="$PROTOBUF_FW/Headers"
-    local PROTOBUF_LIB="$PROTOBUF_FW/Protobuf_C_"
+    # Extract framework name from path (e.g., Protobuf.framework -> Protobuf)
+    local FW_BASENAME=$(basename "$PROTOBUF_FW" .framework)
+    local PROTOBUF_LIB="$PROTOBUF_FW/$FW_BASENAME"
 
     # Compiler flags
     local CC="$(xcrun -sdk $SDK_NAME -find clang)"
